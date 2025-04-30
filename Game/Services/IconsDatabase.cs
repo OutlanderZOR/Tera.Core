@@ -12,10 +12,11 @@ namespace Tera.Game
 {
     public class IconsDatabase
     {
-        private readonly Dictionary<string, Bitmap> _bitmaps = new Dictionary<string, Bitmap>();
+        private readonly Dictionary<string, byte[]> _bitmaps = new();
         private readonly Package _icons;
         private readonly Dictionary<string, BitmapImage> _images = new Dictionary<string, BitmapImage>();
         private readonly BitmapImage _emptyBitmap;
+        private readonly byte[] _emptyBitmapArray;
         private readonly object _lock = new object();
 
         public IconsDatabase(string resourceDirectory)
@@ -32,6 +33,7 @@ namespace Tera.Game
                 _emptyBitmap.CacheOption=BitmapCacheOption.OnLoad;
                 _emptyBitmap.EndInit();
                 _emptyBitmap.Freeze();
+                _emptyBitmapArray = memory.ToArray();
             }
         }
 
@@ -65,9 +67,9 @@ namespace Tera.Game
             return image;
         }
 
-        public Bitmap GetBitmap(string iconName)
+        public byte[] GetBitmap(string iconName)
         {
-            Bitmap image;
+            byte[] image;
             if (_bitmaps.TryGetValue(iconName, out image) || string.IsNullOrEmpty(iconName))
             {
                 return image;
@@ -75,12 +77,15 @@ namespace Tera.Game
             var ur = new Uri("/" + iconName + ".png", UriKind.Relative);
             lock (_lock) {
                 if (_icons.PartExists(ur))
-                    using (var stream = _icons.GetPart(ur).GetStream()) {
-                        MemoryStream mem = new MemoryStream();
-                        stream.CopyTo(mem);
-                        image = new Bitmap(mem);
+                    using (var stream = _icons.GetPart(ur).GetStream())
+                    {
+                        image = new byte[stream.Length];
+                        stream.ReadExactly(image, 0, image.Length);
                     }
-                else image = new Bitmap(1, 1);
+                else
+                {
+                    image = _emptyBitmapArray;
+                }
             }
             _bitmaps[iconName] = image;
             return image;
